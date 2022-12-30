@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block content %}
+        <div class="wrapper_content">
+            <div class="wrapper_canvas">
+                <canvas id="canvas" width="280" height="280" class="canvas"></canvas>
+                <button onclick="AjaxCall()" value="predict" class="button main_button">Predict</button>
+                <button id="clear_button" value="clear" class="button secondary_button">Clear</button>
+            </div>
+            <div class="wrapper_title">
+                <h1 class="title"><span class="subtitle">Handwritten</span> digit recognition</h1>
+                <div class="wrapper_tooltip">
+                    <img class="img_tooltip" src="../static/arrow.png" alt="arrow">
+                    <p class="main_tooltip">Draw a digit here!<br><span class="secondary_tooltip">*from 0 to 9</span></p>
+                </div>
+                <div class="wrapper_result">
+                    <p class="text_result" id="text_result"></p>
+                    <p class="num_result" id="result"></p>
+                </div>
+            </div>
+        </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.3.min.js" integrity="sha256-pvPw+upLPUjgMXY0G+8O0xUf+/Im1MZjXxxgOcBQBXU=" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        function AjaxCall() {
+            event.preventDefault();
+            var canvasObj = document.getElementById("canvas");
+            var img = canvasObj.toDataURL();
+            $.ajax({
+                type: "POST",
+                url: "/",
+                async: true,
+                dataType: "json",
+                data: {csrfmiddlewaretoken: '{{ csrf_token }}', img: img},
+                success: function (data) {
+                    $('#text_result').text(' Predicted output: ');
+                    $('#result').text(data['digit']);
+                    $('.wrapper_page').parent().prepend($('<div>', {
+                        'class': 'shadow_result'
+                    }));
+                    $('.num_result').parent().append($('<button>', {
+                        'text': 'Okay', 'class': 'button result_button',
+                        'onClick': 'hideShadow()',
+                    }));
+                    $('.wrapper_canvas, .title, .wrapper_tooltip').addClass('blur');
+                    $('.background').addClass('background_blur');
+                }
+            })
+        }
+
+        function hideShadow() {
+                $('#text_result').text('');
+                $('#result').text('');
+                $('.shadow_result').remove();
+                $('.result_button').remove();
+                $('.wrapper_canvas, .title, .wrapper_tooltip').removeClass('blur');
+                $('.background').removeClass('background_blur');
+        }
+
+        // CSRF code
+        function getCookie(name) {
+            let cookieValue = null;
+            let i = 0;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (i; i < cookies.length; i++) {
+                    const cookie = jQuery.trim(cookies[i]);
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        function csrfSafeMethod(method) {
+            // these HTTP methods do not require CSRF protection
+            return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+        }
+
+        $.ajaxSetup({
+            crossDomain: false, // obviates need for sameOrigin test
+            beforeSend: function (xhr, settings) {
+                if (!csrfSafeMethod(settings.type)) {
+                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                }
+            }
+        });
+    </script>
+{% endblock %}
+
+{% block load_js %}
+    (function() {
+            // Get a regular interval for drawing to the screen
+			window.requestAnimFrame = (function (callback) {
+				return window.requestAnimationFrame ||
+							window.webkitRequestAnimationFrame ||
+							window.mozRequestAnimationFrame ||
+							window.oRequestAnimationFrame ||
+							window.msRequestAnimaitonFrame ||
+							function (callback) {
+							 	window.setTimeout(callback, 1000/60);
+							};
+			})();
+
+            var canvas = document.querySelector( "#canvas" );
+            var ctx = canvas.getContext( "2d" );
+            ctx.width = 280;
+            ctx.height = 280;
+
+            var drawing = false;
+            var mousePos = { x: 0, y: 0 };
+            var lastPos = { x: 0, y: 0 };
+
+            ctx.fillStyle="#fcfefd";
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.color = "black";
+            ctx.lineWidth = 3;
+            ctx.lineJoin = ctx.lineCap = 'round';
+
+            debug();
+
+            canvas.addEventListener("mousedown", function (e) {
+				drawing = true;
+				lastPos = getMousePos(canvas, e);
+			}, false);
+			canvas.addEventListener("mouseup", function (e) {
+				drawing = false;
+			}, false);
+			canvas.addEventListener("mousemove", function (e) {
+				mousePos = getMousePos(canvas, e);
+			}, false);
+
+			// Set up touch events for mobile, etc
+			canvas.addEventListener("touchstart", function (e) {
+				mousePos = getTouchPos(canvas, e);
+				var touch = e.touches[0];
+				var mouseEvent = new MouseEvent("mousedown", {
+					clientX: touch.clientX,
+					clientY: touch.clientY
+				});
+				canvas.dispatchEvent(mouseEvent);
+			}, { passive: true },  false);
+			canvas.addEventListener("touchend", function (e) {
+				var mouseEvent = new MouseEvent("mouseup", {});
+				canvas.dispatchEvent(mouseEvent);
+			}, false);
+			canvas.addEventListener("touchmove", function (e) {
+				var touch = e.touches[0];
+				var mouseEvent = new MouseEvent("mousemove", {
+					clientX: touch.clientX,
+					clientY: touch.clientY
+				});
+				canvas.dispatchEvent(mouseEvent);
+			}, { passive: true }, false);
+
+			// Prevent scrolling when touching the canvas
+{#			document.body.addEventListener("touchstart", function (e) {#}
+{#				if (e.target == canvas) {#}
+{#					e.preventDefault();#}
+{#				}#}
+{#			}, false);#}
+{#			document.body.addEventListener("touchend", function (e) {#}
+{#				if (e.target == canvas) {#}
+{#					e.preventDefault();#}
+{#				}#}
+{#			}, false);#}
+{#			document.body.addEventListener("touchmove", function (e) {#}
+{#				if (e.target == canvas) {#}
+{#					e.preventDefault();#}
+{#				}#}
+{#			}, false);#}
+
+			// Get the position of the mouse relative to the canvas
+			function getMousePos(canvasDom, mouseEvent) {
+				var rect = canvasDom.getBoundingClientRect();
+				return {
+					x: mouseEvent.clientX - rect.left,
+					y: mouseEvent.clientY - rect.top
+				};
+			}
+
+			// Get the position of a touch relative to the canvas
+			function getTouchPos(canvasDom, touchEvent) {
+				var rect = canvasDom.getBoundingClientRect();
+				return {
+					x: touchEvent.touches[0].clientX - rect.left,
+					y: touchEvent.touches[0].clientY - rect.top
+				};
+			}
+
+			// Draw to the canvas
+			function renderCanvas() {
+				if (drawing) {
+					ctx.moveTo(lastPos.x, lastPos.y);
+					ctx.lineTo(mousePos.x, mousePos.y);
+					ctx.stroke();
+					lastPos = mousePos;
+				}
+			}
+
+			// Clear the canvas
+
+            function debug() {
+
+                /* CLEAR BUTTON */
+                var clearButton = $( "#clear_button" );
+
+                clearButton.on( "click", function() {
+                    canvas.width = canvas.width;
+                    ctx.lineWidth = 3;
+                    ctx.clearRect( 0, 0, 280, 280 );
+                    ctx.fillStyle="#fcfefd";
+                    ctx.fillRect(0,0,canvas.width,canvas.height);
+                    $('#result').text('');
+                    $('#text_result').text('');
+                    $('.shadow_result').remove();
+                    $('.result_button').remove();
+                    $('.wrapper_canvas, .title, .wrapper_tooltip').removeClass('blur');
+                    $('.background').removeClass('background_blur');
+                });
+            };
+
+			// Allow for animation
+			(function drawLoop () {
+				requestAnimFrame(drawLoop);
+				renderCanvas();
+			})();
+    }());
+{% endblock %}
